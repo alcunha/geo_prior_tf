@@ -42,6 +42,10 @@ flags.DEFINE_string(
     'train_location_info_json', default=None,
     help=('Path to json file containing the location info for training data'))
 
+flags.DEFINE_integer(
+    'max_instances_per_class', default=100,
+    help=('Max number of instances per class sampled at each epoch.'))
+
 if 'random_seed' not in list(FLAGS):
   flags.DEFINE_integer(
       'random_seed', default=42,
@@ -53,8 +57,10 @@ flags.mark_flag_as_required('train_location_info_json')
 def build_input_data():
   input_data = dataloader.JsonInatInputProcessor(
       FLAGS.train_data_json,
-      FLAGS.train_location_info_json)
-  
+      FLAGS.train_location_info_json,
+      is_training=True,
+      max_instances_per_class=FLAGS.max_instances_per_class)
+
   return input_data.make_source_dataset()
 
 def set_random_seeds():
@@ -65,9 +71,9 @@ def set_random_seeds():
 def main(_):
   set_random_seeds()
 
-  dataset = build_input_data()
+  dataset, _, num_classes, _ = build_input_data()
 
-  model = model_builder.create_FCNET(6, 8142, 256)
+  model = model_builder.create_FCNET(6, num_classes, 256)
   model.summary()
 
 if __name__ == '__main__':

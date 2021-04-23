@@ -23,12 +23,19 @@ class JsonInatInputProcessor:
   def __init__(self,
               dataset_json,
               location_info_json,
+              is_training=False,
               remove_invalid=True,
+              max_instances_per_class=-1,
               default_empty_label=0):
     self.dataset_json = dataset_json
     self.location_info_json = location_info_json
+    self.is_training = is_training
     self.default_empty_label = default_empty_label
     self.remove_invalid = remove_invalid
+    self.max_instances_per_class = max_instances_per_class
+    self.num_instances = 0
+    self.num_classes = 0
+    self.num_users = 1
 
   def _load_metadata(self):
     with tf.io.gfile.GFile(self.dataset_json, 'r') as json_file:
@@ -43,6 +50,8 @@ class JsonInatInputProcessor:
                         right_on='image_id')
     else:
       images['category_id'] = self.default_empty_label
+    
+    num_classes = len(json_data['categories'])
 
     with tf.io.gfile.GFile(self.location_info_json, 'r') as json_file:
       json_data = json.load(json_file)
@@ -52,12 +61,51 @@ class JsonInatInputProcessor:
                       how='left',
                       on='id')
 
-    return images
+    return images, num_classes
+
+  def _get_balanced_dataset(self, metadata):
+    num_instances = 0
+    datasets = []
+    for category in list(metadata.category_id.unique()):
+      cat_metadata = metadata[metadata.category_id == category]
+      num_instances_cat = min(len(cat_metadata), self.max_instances_per_class)
+      num_instances += num_instances_cat
+
+      cat_ds = tf.data.Dataset.from_tensor_slices((
+        cat_metadata.id,
+        cat_metadata.lat,
+        cat_metadata.lon,
+        cat_metadata.date_c,
+        cat_metadata.user_id,
+        cat_metadata.category_id))
+      cat_ds = cat_ds.shuffle(len(cat_metadata)).take(num_instances_cat)
+      datasets.append(cat_ds)
+    
+    self.num_instances = num_instances
+
+    return tf.data.experimental.sample_from_datasets(datasets)
 
   def make_source_dataset(self):
-    metadata = self._load_metadata()
+    metadata, num_classes = self._load_metadata()
+    self.num_classes = num_classes
 
     if self.remove_invalid:
       metadata = metadata[metadata.valid].copy()
+    self.num_instances = len(metadata)
+    self.num_users = len(metadata.user_id.unique())
+
+    if self.max_instances_per_class == -1:
+      dataset = tf.data.Dataset.from_tensor_slices((
+        metadata.id,
+        metadata.lat,
+        metadata.lon,
+        metadata.date_c,
+        metadata.user_id,
+        metadata.category_id))
+    else:
+      dataset = self._get_balanced_dataset(metadata)
     
-    return metadata
+    if self.is_training:
+      dataset.shuffle(self.num_instances)
+
+    return dataset, self.num_instances, self.num_classes, self.num_users
