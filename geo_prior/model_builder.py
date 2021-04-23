@@ -14,22 +14,22 @@
 
 import tensorflow as tf
 
-def _createResLayer(inputs, embed_size):
-  x = tf.keras.layers.Dense(embed_size)(inputs)
+def _createResLayer(inputs, embed_dim):
+  x = tf.keras.layers.Dense(embed_dim)(inputs)
   x = tf.keras.layers.Activation('relu')(x)
   x = tf.keras.layers.Dropout(rate=0.5)(x)
-  x = tf.keras.layers.Dense(embed_size)(x)
+  x = tf.keras.layers.Dense(embed_dim)(x)
   x = tf.keras.layers.Activation('relu')(x)
   outputs = tf.keras.layers.add([inputs, x])
 
   return outputs
 
-def create_FCNET(num_inputs, num_classes, embed_size, num_res_blocks=4):
+def create_FCNET(num_inputs, num_classes, embed_dim, num_res_blocks=4):
   inputs = tf.keras.Input(shape=(num_inputs,))
-  x = tf.keras.layers.Dense(embed_size)(inputs)
+  x = tf.keras.layers.Dense(embed_dim)(inputs)
   x = tf.keras.layers.Activation('relu')(x)
   for _ in range(num_res_blocks):
-    x = _createResLayer(x, embed_size)
+    x = _createResLayer(x, embed_dim)
 
   class_embed = tf.keras.layers.Dense(num_classes, use_bias=False)(x)
 

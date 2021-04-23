@@ -24,15 +24,18 @@ class JsonInatInputProcessor:
   def __init__(self,
               dataset_json,
               location_info_json,
+              batch_size,
               loc_encode='encode_cos_sin',
               date_encode='encode_cos_sin',
               use_date_feats=True,
               is_training=False,
               remove_invalid=True,
               max_instances_per_class=-1,
-              default_empty_label=0):
+              default_empty_label=0,
+              batch_drop_remainder=True):
     self.dataset_json = dataset_json
     self.location_info_json = location_info_json
+    self.batch_size = batch_size
     self.loc_encode = loc_encode
     self.date_encode = date_encode
     self.use_date_feats = use_date_feats
@@ -40,9 +43,11 @@ class JsonInatInputProcessor:
     self.default_empty_label = default_empty_label
     self.remove_invalid = remove_invalid
     self.max_instances_per_class = max_instances_per_class
+    self.batch_drop_remainder = batch_drop_remainder
     self.num_instances = 0
     self.num_classes = 0
     self.num_users = 1
+    self.num_feats = 0
 
   def _load_metadata(self):
     with tf.io.gfile.GFile(self.dataset_json, 'r') as json_file:
@@ -92,9 +97,22 @@ class JsonInatInputProcessor:
 
     return tf.data.experimental.sample_from_datasets(datasets)
 
+  def _calculate_num_features(self):
+    num_feats = 0
+
+    if self.loc_encode == 'encode_cos_sin':
+      num_feats += 4
+    
+    if self.use_date_feats:
+      if self.date_encode == 'encode_cos_sin':
+        num_feats += 2
+    
+    self.num_feats = num_feats
+
   def make_source_dataset(self):
     metadata, num_classes = self._load_metadata()
     self.num_classes = num_classes
+    self._calculate_num_features()
 
     if self.remove_invalid:
       metadata = metadata[metadata.valid].copy()
@@ -139,5 +157,9 @@ class JsonInatInputProcessor:
 
       return id, inputs, user_id, category_id
     dataset = dataset.map(_preprocess_inputs, num_parallel_calls=AUTOTUNE)
+    dataset = dataset.batch(self.batch_size,
+                            drop_remainder=self.batch_drop_remainder)
+    dataset = dataset.prefetch(buffer_size=AUTOTUNE)
 
-    return dataset, self.num_instances, self.num_classes, self.num_users
+    return (dataset, self.num_instances, self.num_classes, self.num_users, \
+            self.num_feats)
