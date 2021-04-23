@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import json
+import math
 
 import pandas as pd
 import tensorflow as tf
@@ -23,12 +24,18 @@ class JsonInatInputProcessor:
   def __init__(self,
               dataset_json,
               location_info_json,
+              loc_encode='encode_cos_sin',
+              date_encode='encode_cos_sin',
+              use_date_feats=True,
               is_training=False,
               remove_invalid=True,
               max_instances_per_class=-1,
               default_empty_label=0):
     self.dataset_json = dataset_json
     self.location_info_json = location_info_json
+    self.loc_encode = loc_encode
+    self.date_encode = date_encode
+    self.use_date_feats = use_date_feats
     self.is_training = is_training
     self.default_empty_label = default_empty_label
     self.remove_invalid = remove_invalid
@@ -107,5 +114,30 @@ class JsonInatInputProcessor:
     
     if self.is_training:
       dataset.shuffle(self.num_instances)
+    
+    def _encode_feat(feat, encode):
+      if encode == 'encode_cos_sin':
+        return tf.cos(math.pi*feat), tf.sin(math.pi*feat)
+      else:
+        raise RuntimeError('%s not implemented' % encode)
+
+      return feat 
+
+    def _preprocess_inputs(id, lat, lon, date_c, user_id, category_id):
+      lat = lat/90.0
+      lon = lon/180.0
+      date_c = date_c*2.0 - 1.0
+
+      lat = _encode_feat(lat, self.loc_encode)
+      lon = _encode_feat(lon, self.loc_encode)
+      date_c = _encode_feat(date_c, self.date_encode)
+
+      if self.use_date_feats:
+        inputs = tf.concat([lat, lon, date_c], axis=0)
+      else:
+        inputs = tf.concat([lat, lon], axis=0)
+
+      return id, inputs, user_id, category_id
+    dataset = dataset.map(_preprocess_inputs, num_parallel_calls=AUTOTUNE)
 
     return dataset, self.num_instances, self.num_classes, self.num_users

@@ -46,6 +46,18 @@ flags.DEFINE_integer(
     'max_instances_per_class', default=100,
     help=('Max number of instances per class sampled at each epoch.'))
 
+flags.DEFINE_string(
+    'loc_encode', default='encode_cos_sin',
+    help=('Encoding type for location coordinates'))
+
+flags.DEFINE_string(
+    'date_encode', default='encode_cos_sin',
+    help=('Encoding type for date'))
+
+flags.DEFINE_bool(
+    'use_date_feats', default=True,
+    help=('Include date features to the inputs'))
+
 if 'random_seed' not in list(FLAGS):
   flags.DEFINE_integer(
       'random_seed', default=42,
@@ -59,7 +71,10 @@ def build_input_data():
       FLAGS.train_data_json,
       FLAGS.train_location_info_json,
       is_training=True,
-      max_instances_per_class=FLAGS.max_instances_per_class)
+      max_instances_per_class=FLAGS.max_instances_per_class,
+      loc_encode=FLAGS.loc_encode,
+      date_encode=FLAGS.date_encode,
+      use_date_feats=FLAGS.use_date_feats)
 
   return input_data.make_source_dataset()
 
