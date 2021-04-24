@@ -28,10 +28,12 @@ class JsonInatInputProcessor:
               loc_encode='encode_cos_sin',
               date_encode='encode_cos_sin',
               use_date_feats=True,
+              use_photographers=False,
               is_training=False,
               remove_invalid=True,
               max_instances_per_class=-1,
               default_empty_label=0,
+              provide_instance_id=False,
               batch_drop_remainder=True):
     self.dataset_json = dataset_json
     self.location_info_json = location_info_json
@@ -39,10 +41,12 @@ class JsonInatInputProcessor:
     self.loc_encode = loc_encode
     self.date_encode = date_encode
     self.use_date_feats = use_date_feats
+    self.use_photographers = use_photographers
     self.is_training = is_training
     self.default_empty_label = default_empty_label
     self.remove_invalid = remove_invalid
     self.max_instances_per_class = max_instances_per_class
+    self.provide_instance_id = provide_instance_id
     self.batch_drop_remainder = batch_drop_remainder
     self.num_instances = 0
     self.num_classes = 0
@@ -118,6 +122,9 @@ class JsonInatInputProcessor:
       metadata = metadata[metadata.valid].copy()
     self.num_instances = len(metadata)
     self.num_users = len(metadata.user_id.unique())
+    if self.use_photographers and self.num_users < 2:
+      raise RuntimeError('To add photographers branch to the model, data must'
+                         ' have more than one photographer')
 
     if self.max_instances_per_class == -1:
       dataset = tf.data.Dataset.from_tensor_slices((
@@ -135,13 +142,13 @@ class JsonInatInputProcessor:
     
     def _encode_feat(feat, encode):
       if encode == 'encode_cos_sin':
-        return tf.cos(math.pi*feat), tf.sin(math.pi*feat)
+        return tf.sin(math.pi*feat), tf.cos(math.pi*feat)
       else:
         raise RuntimeError('%s not implemented' % encode)
 
       return feat 
 
-    def _preprocess_inputs(id, lat, lon, date_c, user_id, category_id):
+    def _preprocess_data(id, lat, lon, date_c, user_id, category_id):
       lat = lat/90.0
       lon = lon/180.0
       date_c = date_c*2.0 - 1.0
@@ -151,12 +158,27 @@ class JsonInatInputProcessor:
       date_c = _encode_feat(date_c, self.date_encode)
 
       if self.use_date_feats:
-        inputs = tf.concat([lat, lon, date_c], axis=0)
+        inputs = tf.concat([lon, lat, date_c], axis=0)
       else:
-        inputs = tf.concat([lat, lon], axis=0)
+        inputs = tf.concat([lon, lat], axis=0)
+
+      category_id = tf.one_hot(category_id, self.num_classes)
+      if self.num_users > 1:
+        user_id = tf.one_hot(user_id, self.num_users)
 
       return id, inputs, user_id, category_id
-    dataset = dataset.map(_preprocess_inputs, num_parallel_calls=AUTOTUNE)
+    dataset = dataset.map(_preprocess_data, num_parallel_calls=AUTOTUNE)
+
+    def _select_inputs_outputs(id, inputs, user_id, category_id):
+      if self.use_photographers:
+        outputs = (category_id, user_id, id) if self.provide_instance_id \
+                                             else (category_id, user_id)
+      else:
+        outputs = (category_id, id) if self.provide_instance_id else category_id
+      
+      return inputs, outputs
+    dataset = dataset.map(_select_inputs_outputs, num_parallel_calls=AUTOTUNE)
+
     dataset = dataset.batch(self.batch_size,
                             drop_remainder=self.batch_drop_remainder)
     dataset = dataset.prefetch(buffer_size=AUTOTUNE)

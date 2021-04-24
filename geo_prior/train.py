@@ -27,8 +27,9 @@ from absl import flags
 import numpy as np
 import tensorflow as tf
 
+from data_utils import RandSpatioTemporalGenerator
+from model_builder import FCNet
 import dataloader
-import model_builder
 
 os.environ['TF_DETERMINISTIC_OPS'] = '1'
 
@@ -58,6 +59,10 @@ flags.DEFINE_bool(
     'use_date_feats', default=True,
     help=('Include date features to the inputs'))
 
+flags.DEFINE_bool(
+    'use_photographers', default=False,
+    help=('Include photographers classifier to the model'))
+
 flags.DEFINE_integer(
     'batch_size', default=1024,
     help=('Batch size used during training.'))
@@ -83,7 +88,8 @@ def build_input_data():
       max_instances_per_class=FLAGS.max_instances_per_class,
       loc_encode=FLAGS.loc_encode,
       date_encode=FLAGS.date_encode,
-      use_date_feats=FLAGS.use_date_feats)
+      use_date_feats=FLAGS.use_date_feats,
+      use_photographers=FLAGS.use_photographers)
 
   return input_data.make_source_dataset()
 
@@ -95,9 +101,18 @@ def set_random_seeds():
 def main(_):
   set_random_seeds()
 
-  dataset, _, num_classes, _, num_feats = build_input_data()
-
-  model = model_builder.create_FCNET(num_feats, num_classes, FLAGS.embed_dim)
+  dataset, _, num_classes, num_users, num_feats = build_input_data()
+  randgen = RandSpatioTemporalGenerator(
+      loc_encode=FLAGS.loc_encode,
+      date_encode=FLAGS.date_encode,
+      use_date_feats=FLAGS.use_date_feats)
+  
+  model = FCNet(num_inputs=num_feats,
+                embed_dim=FLAGS.embed_dim,
+                num_classes=num_classes,
+                rand_sample_generator=randgen,
+                num_users=(num_users if FLAGS.use_photographers else 0))
+  model.build((None, num_feats))
   model.summary()
 
 if __name__ == '__main__':
