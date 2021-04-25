@@ -14,16 +14,14 @@
 
 import tensorflow as tf
 
-class WeightedBinaryCrossEntropy:
-  def __init__(self, pos_weight = 1, epsilon=1e-5):
-    self.pos_weight = pos_weight
-    self.epsilon = epsilon
+def weighted_binary_cross_entropy(pos_weight = 1, epsilon=1e-5):
+  def _log(value):
+    return (-1)*(tf.math.log(value + epsilon))
 
-  def _log(self, value):
-    return (-1)*(tf.math.log(value + self.epsilon))
-
-  def __call__(self, y_true, y_pred):
-    log_loss = self.pos_weight * y_true * self._log(y_pred) \
-               + (1 - y_true) * self._log(1 - y_pred)
+  def _call(y_true, y_pred):
+    log_loss = pos_weight * y_true * _log(y_pred) \
+               + (1 - y_true) * _log(1 - y_pred)
 
     return tf.reduce_mean(log_loss, axis=-1)
+
+  return _call

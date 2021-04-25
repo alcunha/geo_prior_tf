@@ -132,6 +132,8 @@ def train_model(model, dataset, loss_fn):
 
   model.compile(optimizer=optimizer, loss=loss_fn)
 
+  return model.fit(dataset, epochs=FLAGS.epochs, callbacks=callbacks)
+
 def set_random_seeds():
   random.seed(FLAGS.random_seed)
   np.random.seed(FLAGS.random_seed)
@@ -152,7 +154,7 @@ def main(_):
                 rand_sample_generator=randgen,
                 num_users=(num_users if FLAGS.use_photographers else 0))
 
-  loss_o_loc = losses.WeightedBinaryCrossEntropy(pos_weight=num_classes)
+  loss_o_loc = losses.weighted_binary_cross_entropy(pos_weight=num_classes)
 
   model.build((None, num_feats))
   model.summary()

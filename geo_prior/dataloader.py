@@ -161,6 +161,7 @@ class JsonInatInputProcessor:
         inputs = tf.concat([lon, lat, date_c], axis=0)
       else:
         inputs = tf.concat([lon, lat], axis=0)
+      inputs = tf.cast(inputs, tf.float32)
 
       category_id = tf.one_hot(category_id, self.num_classes)
       if self.num_users > 1:
