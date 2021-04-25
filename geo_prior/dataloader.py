@@ -33,6 +33,7 @@ class JsonInatInputProcessor:
               remove_invalid=True,
               max_instances_per_class=-1,
               default_empty_label=0,
+              num_classes=None,
               provide_instance_id=False,
               batch_drop_remainder=True):
     self.dataset_json = dataset_json
@@ -49,7 +50,7 @@ class JsonInatInputProcessor:
     self.provide_instance_id = provide_instance_id
     self.batch_drop_remainder = batch_drop_remainder
     self.num_instances = 0
-    self.num_classes = 0
+    self.num_classes = num_classes
     self.num_users = 1
     self.num_feats = 0
 
@@ -115,8 +116,9 @@ class JsonInatInputProcessor:
 
   def make_source_dataset(self):
     metadata, num_classes = self._load_metadata()
-    self.num_classes = num_classes
     self._calculate_num_features()
+    if self.num_classes is None:
+      self.num_classes = num_classes
 
     if self.remove_invalid:
       metadata = metadata[metadata.valid].copy()
