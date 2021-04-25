@@ -29,6 +29,7 @@ import tensorflow as tf
 
 from models import FCNet
 import dataloader
+import losses
 
 os.environ['TF_DETERMINISTIC_OPS'] = '1'
 
@@ -70,6 +71,18 @@ flags.DEFINE_integer(
     'embed_dim', default=256,
     help=('Embedding dimension for geo prior model'))
 
+flags.DEFINE_float(
+    'lr', default=0.0005,
+    help=('Initial learning rate'))
+
+flags.DEFINE_float(
+    'lr_decay', default=0.98,
+    help=('Learning rate decay at each epoch'))
+
+flags.DEFINE_integer(
+    'epochs', default=30,
+    help=('Number of epochs to training for'))
+
 if 'random_seed' not in list(FLAGS):
   flags.DEFINE_integer(
       'random_seed', default=42,
@@ -92,6 +105,21 @@ def build_input_data():
 
   return input_data.make_source_dataset()
 
+def lr_scheduler(epoch, lr):
+  if epoch < 1:
+      return lr
+  else:
+      return lr * FLAGS.lr_decay
+
+def train_model(model, dataset, loss_fn):
+  callbacks = []
+
+  optimizer = tf.keras.optimizers.Adam(learning_rate=FLAGS.lr)
+  lr_callback = tf.keras.callbacks.LearningRateScheduler(lr_scheduler)
+  callbacks.append(lr_callback)
+
+  model.compile(optimizer=optimizer, loss=loss_fn)
+
 def set_random_seeds():
   random.seed(FLAGS.random_seed)
   np.random.seed(FLAGS.random_seed)
@@ -105,14 +133,19 @@ def main(_):
       loc_encode=FLAGS.loc_encode,
       date_encode=FLAGS.date_encode,
       use_date_feats=FLAGS.use_date_feats)
-  
+
   model = FCNet(num_inputs=num_feats,
                 embed_dim=FLAGS.embed_dim,
                 num_classes=num_classes,
                 rand_sample_generator=randgen,
                 num_users=(num_users if FLAGS.use_photographers else 0))
+
+  loss_o_loc = losses.WeightedBinaryCrossEntropy(pos_weight=num_classes)
+
   model.build((None, num_feats))
   model.summary()
+
+  train_model(model, dataset, loss_o_loc)
 
 if __name__ == '__main__':
   app.run(main)

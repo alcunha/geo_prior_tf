@@ -25,5 +25,5 @@ class WeightedBinaryCrossEntropy:
   def __call__(self, y_true, y_pred):
     log_loss = self.pos_weight * y_true * self._log(y_pred) \
                + (1 - y_true) * self._log(1 - y_pred)
-    
+
     return tf.reduce_mean(log_loss, axis=-1)
