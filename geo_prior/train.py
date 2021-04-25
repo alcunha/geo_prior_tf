@@ -27,8 +27,7 @@ from absl import flags
 import numpy as np
 import tensorflow as tf
 
-from data_utils import RandSpatioTemporalGenerator
-from model_builder import FCNet
+from models import FCNet
 import dataloader
 
 os.environ['TF_DETERMINISTIC_OPS'] = '1'
@@ -102,7 +101,7 @@ def main(_):
   set_random_seeds()
 
   dataset, _, num_classes, num_users, num_feats = build_input_data()
-  randgen = RandSpatioTemporalGenerator(
+  randgen = dataloader.RandSpatioTemporalGenerator(
       loc_encode=FLAGS.loc_encode,
       date_encode=FLAGS.date_encode,
       use_date_feats=FLAGS.use_date_feats)
