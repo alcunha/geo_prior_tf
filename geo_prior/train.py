@@ -83,6 +83,10 @@ flags.DEFINE_integer(
     'epochs', default=30,
     help=('Number of epochs to training for'))
 
+flags.DEFINE_string(
+    'model_dir', default=None,
+    help=('Location of the model checkpoint files'))
+
 if 'random_seed' not in list(FLAGS):
   flags.DEFINE_integer(
       'random_seed', default=42,
@@ -90,6 +94,7 @@ if 'random_seed' not in list(FLAGS):
 
 flags.mark_flag_as_required('train_data_json')
 flags.mark_flag_as_required('train_location_info_json')
+flags.mark_flag_as_required('model_dir')
 
 def build_input_data():
   input_data = dataloader.JsonInatInputProcessor(
@@ -112,11 +117,18 @@ def lr_scheduler(epoch, lr):
       return lr * FLAGS.lr_decay
 
 def train_model(model, dataset, loss_fn):
-  callbacks = []
+  summary_dir = os.path.join(FLAGS.model_dir, "summaries")
+  summary_callback = tf.keras.callbacks.TensorBoard(summary_dir)
+
+  checkpoint_filepath = os.path.join(FLAGS.model_dir, "ckp")
+  checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+      filepath=checkpoint_filepath,
+      save_freq='epoch')
 
   optimizer = tf.keras.optimizers.Adam(learning_rate=FLAGS.lr)
   lr_callback = tf.keras.callbacks.LearningRateScheduler(lr_scheduler)
-  callbacks.append(lr_callback)
+
+  callbacks = [summary_callback, checkpoint_callback, lr_callback]
 
   model.compile(optimizer=optimizer, loss=loss_fn)
 
