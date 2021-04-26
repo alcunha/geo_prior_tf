@@ -18,11 +18,13 @@ Set the environment variable PYTHONHASHSEED to a reproducible value
 before you start the python process to ensure that the model trains
 or infers with reproducibility
 """
+import json
 import os
 import random
 
 from absl import app
 from absl import flags
+from scipy import sparse
 import numpy as np
 import tensorflow as tf
 
@@ -60,6 +62,14 @@ flags.DEFINE_integer(
     'num_classes', default=8142,
     help=('Number of classes of the model.'))
 
+flags.DEFINE_string(
+    'prior_type', default='geo_prior',
+    help=('Type of prior to be used for prediction'))
+
+flags.DEFINE_string(
+    'cnn_predictions_file', default=None,
+    help=('File .npz containing class predictions for images on test dataset'))
+
 if 'random_seed' not in list(FLAGS):
   flags.DEFINE_integer(
       'random_seed', default=42,
@@ -67,6 +77,25 @@ if 'random_seed' not in list(FLAGS):
 
 flags.mark_flag_as_required('test_data_json')
 flags.mark_flag_as_required('test_location_info_json')
+flags.mark_flag_as_required('cnn_predictions_file')
+
+class CNNPredictor:
+  def __init__(self, cnn_predictions_npz, data_json):
+    with open(data_json) as json_file:
+      json_data = json.load(json_file)
+    samples = json_data['images']
+
+    preds = sparse.load_npz(cnn_predictions_npz)
+    preds = np.array(preds.todense(), dtype=np.float32)
+
+    preds_dict = {sample['id']: pred for sample, pred in zip(samples, preds)}
+    self.preds_dict = preds_dict
+  
+  def get_predictions(self, batch_ids):
+    ids_list = list(batch_ids.numpy())
+    preds = [self.preds_dict[instance_id] for instance_id in ids_list]
+    return tf.convert_to_tensor(preds)
+
 
 def build_input_data():
   input_data = dataloader.JsonInatInputProcessor(
@@ -97,6 +126,7 @@ def main(_):
   set_random_seeds()
 
   dataset, num_feats = build_input_data()
+  cnn_model = CNNPredictor(FLAGS.cnn_predictions_file, FLAGS.test_data_json)
 
 if __name__ == '__main__':
   app.run(main)
