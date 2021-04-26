@@ -31,6 +31,7 @@ class JsonInatInputProcessor:
               use_photographers=False,
               is_training=False,
               remove_invalid=True,
+              provide_validity_info_output=False,
               max_instances_per_class=-1,
               default_empty_label=0,
               num_classes=None,
@@ -46,6 +47,7 @@ class JsonInatInputProcessor:
     self.is_training = is_training
     self.default_empty_label = default_empty_label
     self.remove_invalid = remove_invalid
+    self.provide_validity_info_output = provide_validity_info_output
     self.max_instances_per_class = max_instances_per_class
     self.provide_instance_id = provide_instance_id
     self.batch_drop_remainder = batch_drop_remainder
@@ -92,6 +94,7 @@ class JsonInatInputProcessor:
         num_instances += self.max_instances_per_class
         cat_ds = tf.data.Dataset.from_tensor_slices((
                       cat_metadata.id,
+                      cat_metadata.valid,
                       cat_metadata.lat,
                       cat_metadata.lon,
                       cat_metadata.date_c,
@@ -108,6 +111,7 @@ class JsonInatInputProcessor:
     others_metadata = metadata[metadata.category_id.isin(other_categories)]
     others_ds = tf.data.Dataset.from_tensor_slices((
                       others_metadata.id,
+                      others_metadata.valid,
                       others_metadata.lat,
                       others_metadata.lon,
                       others_metadata.date_c,
@@ -146,6 +150,7 @@ class JsonInatInputProcessor:
     if self.max_instances_per_class == -1:
       dataset = tf.data.Dataset.from_tensor_slices((
         metadata.id,
+        metadata.valid,
         metadata.lat,
         metadata.lon,
         metadata.date_c,
@@ -165,9 +170,9 @@ class JsonInatInputProcessor:
 
       return feat 
 
-    def _preprocess_data(id, lat, lon, date_c, user_id, category_id):
-      lat = lat/90.0
-      lon = lon/180.0
+    def _preprocess_data(id, valid, lat, lon, date_c, user_id, category_id):
+      lat = tf.cond(valid, lambda: lat/90.0, lambda: tf.cast(0.0, tf.float64))
+      lon = tf.cond(valid, lambda: lon/180.0, lambda: tf.cast(0.0, tf.float64))
       lat = _encode_feat(lat, self.loc_encode)
       lon = _encode_feat(lon, self.loc_encode)
 
@@ -184,10 +189,30 @@ class JsonInatInputProcessor:
       if self.use_photographers:
         if self.num_users > 1:
           user_id = tf.one_hot(user_id, self.num_users)
-        outputs = (category_id, user_id, id) if self.provide_instance_id \
-                                             else (category_id, user_id)
+        if self.provide_validity_info_output:
+          valid = tf.cast(valid, tf.float32)
+          if self.provide_instance_id:
+            outputs = category_id, user_id, valid, id
+          else:
+            outputs = category_id, user_id, valid
+        else:
+          if self.provide_instance_id:
+            outputs = category_id, user_id, id
+          else:
+            outputs = category_id, user_id
       else:
-        outputs = (category_id, id) if self.provide_instance_id else category_id
+        if self.provide_validity_info_output:
+          valid = tf.cast(valid, tf.float32)
+          if self.provide_instance_id:
+            outputs = category_id, valid, id
+          else:
+            outputs = category_id, valid
+        else:
+          if self.provide_instance_id:
+            outputs = category_id, id
+          else:
+            outputs = category_id
+
       return inputs, outputs
 
     dataset = dataset.map(_preprocess_data, num_parallel_calls=AUTOTUNE)

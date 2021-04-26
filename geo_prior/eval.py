@@ -57,7 +57,7 @@ flags.DEFINE_integer(
     help=('Batch size used during prediction.'))
 
 flags.DEFINE_integer(
-    'num_classes', default=None,
+    'num_classes', default=8142,
     help=('Number of classes of the model.'))
 
 if 'random_seed' not in list(FLAGS):
@@ -79,6 +79,7 @@ def build_input_data():
     use_photographers=False,
     is_training=False,
     remove_invalid=False,
+    provide_validity_info_output=True,
     num_classes=FLAGS.num_classes,
     provide_instance_id=True,
     batch_drop_remainder=False)
