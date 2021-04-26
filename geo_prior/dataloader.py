@@ -82,25 +82,40 @@ class JsonInatInputProcessor:
 
   def _get_balanced_dataset(self, metadata):
     num_instances = 0
-    datasets = []
+    dataset = None
+    other_categories = []
     for category in list(metadata.category_id.unique()):
       cat_metadata = metadata[metadata.category_id == category]
-      num_instances_cat = min(len(cat_metadata), self.max_instances_per_class)
-      num_instances += num_instances_cat
+      num_instances_cat = len(cat_metadata)
 
-      cat_ds = tf.data.Dataset.from_tensor_slices((
-        cat_metadata.id,
-        cat_metadata.lat,
-        cat_metadata.lon,
-        cat_metadata.date_c,
-        cat_metadata.user_id,
-        cat_metadata.category_id))
-      cat_ds = cat_ds.shuffle(len(cat_metadata)).take(num_instances_cat)
-      datasets.append(cat_ds)
-    
+      if num_instances_cat > self.max_instances_per_class:
+        num_instances += self.max_instances_per_class
+        cat_ds = tf.data.Dataset.from_tensor_slices((
+                      cat_metadata.id,
+                      cat_metadata.lat,
+                      cat_metadata.lon,
+                      cat_metadata.date_c,
+                      cat_metadata.user_id,
+                      cat_metadata.category_id))
+        cat_ds = cat_ds.shuffle(num_instances_cat)
+        cat_ds = cat_ds.take(self.max_instances_per_class)
+        dataset = cat_ds if dataset is None else dataset.concatenate(cat_ds)
+      else:
+        other_categories.append(category)
+        num_instances += num_instances_cat
+
     self.num_instances = num_instances
+    others_metadata = metadata[metadata.category_id.isin(other_categories)]
+    others_ds = tf.data.Dataset.from_tensor_slices((
+                      others_metadata.id,
+                      others_metadata.lat,
+                      others_metadata.lon,
+                      others_metadata.date_c,
+                      others_metadata.user_id,
+                      others_metadata.category_id))
+    dataset = others_ds if dataset is None else dataset.concatenate(others_ds)
 
-    return tf.data.experimental.sample_from_datasets(datasets)
+    return dataset
 
   def _calculate_num_features(self):
     num_feats = 0
@@ -138,10 +153,10 @@ class JsonInatInputProcessor:
         metadata.category_id))
     else:
       dataset = self._get_balanced_dataset(metadata)
-    
+
     if self.is_training:
       dataset.shuffle(self.num_instances)
-    
+
     def _encode_feat(feat, encode):
       if encode == 'encode_cos_sin':
         return tf.sin(math.pi*feat), tf.cos(math.pi*feat)
@@ -153,35 +168,29 @@ class JsonInatInputProcessor:
     def _preprocess_data(id, lat, lon, date_c, user_id, category_id):
       lat = lat/90.0
       lon = lon/180.0
-      date_c = date_c*2.0 - 1.0
-
       lat = _encode_feat(lat, self.loc_encode)
       lon = _encode_feat(lon, self.loc_encode)
-      date_c = _encode_feat(date_c, self.date_encode)
 
       if self.use_date_feats:
+        date_c = date_c*2.0 - 1.0
+        date_c = _encode_feat(date_c, self.date_encode)
         inputs = tf.concat([lon, lat, date_c], axis=0)
       else:
         inputs = tf.concat([lon, lat], axis=0)
       inputs = tf.cast(inputs, tf.float32)
 
       category_id = tf.one_hot(category_id, self.num_classes)
-      if self.num_users > 1:
-        user_id = tf.one_hot(user_id, self.num_users)
 
-      return id, inputs, user_id, category_id
-    dataset = dataset.map(_preprocess_data, num_parallel_calls=AUTOTUNE)
-
-    def _select_inputs_outputs(id, inputs, user_id, category_id):
       if self.use_photographers:
+        if self.num_users > 1:
+          user_id = tf.one_hot(user_id, self.num_users)
         outputs = (category_id, user_id, id) if self.provide_instance_id \
                                              else (category_id, user_id)
       else:
         outputs = (category_id, id) if self.provide_instance_id else category_id
-      
       return inputs, outputs
-    dataset = dataset.map(_select_inputs_outputs, num_parallel_calls=AUTOTUNE)
 
+    dataset = dataset.map(_preprocess_data, num_parallel_calls=AUTOTUNE)
     dataset = dataset.batch(self.batch_size,
                             drop_remainder=self.batch_drop_remainder)
     dataset = dataset.prefetch(buffer_size=AUTOTUNE)
