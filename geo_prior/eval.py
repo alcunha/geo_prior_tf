@@ -29,6 +29,7 @@ from sklearn.metrics import accuracy_score
 import numpy as np
 import tensorflow as tf
 
+from models import FCNet
 import dataloader
 
 os.environ['TF_DETERMINISTIC_OPS'] = '1'
@@ -63,9 +64,21 @@ flags.DEFINE_integer(
     'num_classes', default=8142,
     help=('Number of classes of the model.'))
 
+flags.DEFINE_integer(
+    'num_users', default=0,
+    help=('Number of photographers of the model.'))
+
 flags.DEFINE_string(
     'prior_type', default='geo_prior',
     help=('Type of prior to be used for prediction'))
+
+flags.DEFINE_string(
+    'ckpt_dir', default=None,
+    help=('Location of the checkpoint files for the geo prior model'))
+
+flags.DEFINE_integer(
+    'embed_dim', default=256,
+    help=('Embedding dimension for geo prior model'))
 
 flags.DEFINE_string(
     'cnn_predictions_file', default=None,
@@ -83,6 +96,7 @@ if 'random_seed' not in list(FLAGS):
 flags.mark_flag_as_required('test_data_json')
 flags.mark_flag_as_required('test_location_info_json')
 flags.mark_flag_as_required('cnn_predictions_file')
+flags.mark_flag_as_required('ckpt_dir')
 
 class CNNPredictor:
   def __init__(self, cnn_predictions_npz, data_json):
@@ -122,17 +136,46 @@ def build_input_data():
 
   return dataset, num_feats
 
+def load_prior_model(num_feats):
+  randgen = dataloader.RandSpatioTemporalGenerator(
+      loc_encode=FLAGS.loc_encode,
+      date_encode=FLAGS.date_encode,
+      use_date_feats=FLAGS.use_date_feats)
+
+  model = FCNet(num_inputs=num_feats,
+                embed_dim=FLAGS.embed_dim,
+                num_classes=FLAGS.num_classes,
+                rand_sample_generator=randgen,
+                num_users=FLAGS.num_users)
+  
+  checkpoint_path = os.path.join(FLAGS.ckpt_dir, "ckp")
+  model.load_weights(checkpoint_path)
+
+  return model
+
+def mix_predictions(cnn_preds, prior_preds, valid):
+  valid = tf.expand_dims(valid, axis=-1)
+  return cnn_preds*prior_preds*valid + (1 - valid)*cnn_preds
+
 def _decode_one_hot(one_hot_tensor):
   return tf.argmax(one_hot_tensor, axis=1).numpy()
 
-def eval_model(cnn_model, dataset):
+def eval_model(cnn_model, prior_model, dataset):
   labels = []
   predictions = []
   count = 0
 
   for batch, metadata in dataset:
     label, valid, ids = metadata
-    preds = cnn_model.get_predictions(ids)
+    cnn_preds = cnn_model.get_predictions(ids)
+
+    if FLAGS.prior_type == 'geo_prior':
+      prior_preds = prior_model(batch, training=False)
+      preds = mix_predictions(cnn_preds, prior_preds, valid)
+    elif FLAGS.prior_type == 'no_prior':
+      preds = cnn_preds
+    else:
+      raise RuntimeError('%s not implemented' % FLAGS.prior_type)
 
     labels += list(_decode_one_hot(label))
     predictions += list(_decode_one_hot(preds))
@@ -153,8 +196,9 @@ def main(_):
 
   dataset, num_feats = build_input_data()
   cnn_model = CNNPredictor(FLAGS.cnn_predictions_file, FLAGS.test_data_json)
+  prior_model = load_prior_model(num_feats)
 
-  acc = eval_model(cnn_model, dataset)
+  acc = eval_model(cnn_model, prior_model, dataset)
 
   print("Accuracy: %.2f" % (acc*100))
 
