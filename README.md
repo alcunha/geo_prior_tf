@@ -1,5 +1,14 @@
 This is an unofficial TensorFlow implementation of [Presence-Only Geographical Priors for Fine-Grained Image Classification](https://arxiv.org/abs/1906.05272)
 
+### Requirements
+
+Prepare an environment with python=3.8, tensorflow=2.3.1.
+
+Dependencies can be installed using the following command:
+```bash
+pip install -r requirements.txt
+```
+
 ### Training
 
 To train a geo prior model use the script `train.py`:
