@@ -101,7 +101,6 @@ if 'random_seed' not in list(FLAGS):
       help=('Random seed for reproductible experiments'))
 
 flags.mark_flag_as_required('train_data_json')
-flags.mark_flag_as_required('train_location_info_json')
 flags.mark_flag_as_required('model_dir')
 
 def build_input_data(data_json,
@@ -110,7 +109,7 @@ def build_input_data(data_json,
                      num_classes=None):
   input_data = dataloader.JsonInatInputProcessor(
       data_json,
-      location_info_json,
+      location_info_json=location_info_json,
       batch_size=FLAGS.batch_size,
       is_training=is_training,
       max_instances_per_class=(FLAGS.max_instances_per_class if is_training \
@@ -166,9 +165,6 @@ def main(_):
       use_date_feats=FLAGS.use_date_feats)
 
   if FLAGS.val_data_json is not None:
-    if FLAGS.val_location_info_json is None:
-      raise RuntimeError('To use validation data, you must specify both'
-                         ' --val_data_json and --val_location_info_json')
     val_dataset, _, _, _, _ = build_input_data(FLAGS.val_data_json,
       FLAGS.val_location_info_json, is_training=False, num_classes=num_classes)
   else:

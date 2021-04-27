@@ -18,13 +18,15 @@ import math
 import pandas as pd
 import tensorflow as tf
 
+import utils
+
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 
 class JsonInatInputProcessor:
   def __init__(self,
               dataset_json,
-              location_info_json,
-              batch_size,
+              location_info_json=None,
+              batch_size=1,
               loc_encode='encode_cos_sin',
               date_encode='encode_cos_sin',
               use_date_feats=True,
@@ -56,6 +58,28 @@ class JsonInatInputProcessor:
     self.num_users = 1
     self.num_feats = 0
 
+  def _validate_location_info_from_metadata(self, metadata_df):
+    metadata = metadata_df.copy()
+    if ('longitude' not in metadata.columns):
+      raise RuntimeError('Logintude info does not exists on dataset_json.'
+                         ' Please add to json or specify location_info_json.')
+    if ('latitude' not in metadata.columns):
+      raise RuntimeError('Latitude info does not exists on dataset_json.'
+                         ' Please add to json or specify location_info_json.')
+    if ('date' not in metadata.columns):
+      raise RuntimeError('Date info does not exists on dataset_json.'
+                         ' Please add to json or specify location_info_json.')
+
+    if ('user_id' not in metadata.columns):
+      metadata['user_id'] = 0
+    metadata['lat'] = metadata['latitude']
+    metadata['lon'] = metadata['longitude']
+    metadata['valid'] = ~metadata.longitude.isna()
+    metadata['date_c'] = metadata.apply(
+                            lambda row: utils.date2float(row['date']), axis=1)
+
+    return metadata
+
   def _load_metadata(self):
     with tf.io.gfile.GFile(self.dataset_json, 'r') as json_file:
       json_data = json.load(json_file)
@@ -72,13 +96,16 @@ class JsonInatInputProcessor:
     
     num_classes = len(json_data['categories'])
 
-    with tf.io.gfile.GFile(self.location_info_json, 'r') as json_file:
-      json_data = json.load(json_file)
-    location_info = pd.DataFrame(json_data)
-    images = pd.merge(images,
-                      location_info,
-                      how='left',
-                      on='id')
+    if self.location_info_json is None:
+      images = self._validate_location_info_from_metadata(images)
+    else:
+      with tf.io.gfile.GFile(self.location_info_json, 'r') as json_file:
+        json_data = json.load(json_file)
+      location_info = pd.DataFrame(json_data)
+      images = pd.merge(images,
+                        location_info,
+                        how='left',
+                        on='id')
 
     return images, num_classes
 
