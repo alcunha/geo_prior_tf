@@ -25,6 +25,7 @@ import random
 from absl import app
 from absl import flags
 from scipy import sparse
+from sklearn.metrics import accuracy_score
 import numpy as np
 import tensorflow as tf
 
@@ -69,6 +70,10 @@ flags.DEFINE_string(
 flags.DEFINE_string(
     'cnn_predictions_file', default=None,
     help=('File .npz containing class predictions for images on test dataset'))
+
+flags.DEFINE_integer(
+    'log_frequence', default=10,
+    help=('Log prediction every n steps'))
 
 if 'random_seed' not in list(FLAGS):
   flags.DEFINE_integer(
@@ -117,6 +122,27 @@ def build_input_data():
 
   return dataset, num_feats
 
+def _decode_one_hot(one_hot_tensor):
+  return tf.argmax(one_hot_tensor, axis=1).numpy()
+
+def eval_model(cnn_model, dataset):
+  labels = []
+  predictions = []
+  count = 0
+
+  for batch, metadata in dataset:
+    label, valid, ids = metadata
+    preds = cnn_model.get_predictions(ids)
+
+    labels += list(_decode_one_hot(label))
+    predictions += list(_decode_one_hot(preds))
+
+    if count % FLAGS.log_frequence == 0:
+      tf.compat.v1.logging.info('Finished eval step %d' % count)
+    count += 1
+  
+  return accuracy_score(labels, predictions)
+
 def set_random_seeds():
   random.seed(FLAGS.random_seed)
   np.random.seed(FLAGS.random_seed)
@@ -127,6 +153,10 @@ def main(_):
 
   dataset, num_feats = build_input_data()
   cnn_model = CNNPredictor(FLAGS.cnn_predictions_file, FLAGS.test_data_json)
+
+  acc = eval_model(cnn_model, dataset)
+
+  print("Accuracy: %.2f" % (acc*100))
 
 if __name__ == '__main__':
   app.run(main)
