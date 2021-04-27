@@ -167,8 +167,8 @@ def main(_):
 
   if FLAGS.val_data_json is not None:
     if FLAGS.val_location_info_json is None:
-      raise RuntimeError('To use vlaidation data, you must specify both'
-                         ' --val_data_jsonboth and --val_location_info_json')
+      raise RuntimeError('To use validation data, you must specify both'
+                         ' --val_data_json and --val_location_info_json')
     val_dataset, _, _, _, _ = build_input_data(FLAGS.val_data_json,
       FLAGS.val_location_info_json, is_training=False, num_classes=num_classes)
   else:
