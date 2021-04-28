@@ -32,6 +32,7 @@ class JsonInatInputProcessor:
               use_date_feats=True,
               use_photographers=False,
               is_training=False,
+              use_data_augmentation=False,
               remove_invalid=True,
               provide_validity_info_output=False,
               max_instances_per_class=-1,
@@ -47,6 +48,7 @@ class JsonInatInputProcessor:
     self.use_date_feats = use_date_feats
     self.use_photographers = use_photographers
     self.is_training = is_training
+    self.use_data_augmentation = use_data_augmentation
     self.default_empty_label = default_empty_label
     self.remove_invalid = remove_invalid
     self.provide_validity_info_output = provide_validity_info_output
@@ -198,12 +200,18 @@ class JsonInatInputProcessor:
       return feat 
 
     def _preprocess_data(id, valid, lat, lon, date_c, user_id, category_id):
+      if self.is_training and self.use_data_augmentation:
+        lon, lat = utils.random_loc(lon, lat)
+
       lat = tf.cond(valid, lambda: lat/90.0, lambda: tf.cast(0.0, tf.float64))
       lon = tf.cond(valid, lambda: lon/180.0, lambda: tf.cast(0.0, tf.float64))
       lat = _encode_feat(lat, self.loc_encode)
       lon = _encode_feat(lon, self.loc_encode)
 
       if self.use_date_feats:
+        if self.is_training and self.use_data_augmentation:
+          date_c = utils.random_date(date_c)
+
         date_c = date_c*2.0 - 1.0
         date_c = _encode_feat(date_c, self.date_encode)
         inputs = tf.concat([lon, lat, date_c], axis=0)

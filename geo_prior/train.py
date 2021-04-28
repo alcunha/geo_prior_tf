@@ -75,6 +75,10 @@ flags.DEFINE_bool(
     'use_batch_normalization', default=False,
     help=('Include Batch Normalization to the model'))
 
+flags.DEFINE_bool(
+    'use_data_augmentation', default=False,
+    help=('Use data agumentation on coordinates and date during training'))
+
 flags.DEFINE_integer(
     'batch_size', default=1024,
     help=('Batch size used during training.'))
@@ -122,7 +126,8 @@ def build_input_data(data_json,
       date_encode=FLAGS.date_encode,
       use_date_feats=FLAGS.use_date_feats,
       num_classes=num_classes,
-      use_photographers=(FLAGS.use_photographers if is_training else False))
+      use_photographers=(FLAGS.use_photographers if is_training else False),
+      use_data_augmentation=FLAGS.use_data_augmentation)
 
   return input_data.make_source_dataset()
 
@@ -134,7 +139,8 @@ def lr_scheduler(epoch, lr):
 
 def train_model(model, dataset, val_dataset, loss_fn):
   summary_dir = os.path.join(FLAGS.model_dir, "summaries")
-  summary_callback = tf.keras.callbacks.TensorBoard(summary_dir)
+  summary_callback = tf.keras.callbacks.TensorBoard(summary_dir,
+                                                    profile_batch=0)
 
   checkpoint_filepath = os.path.join(FLAGS.model_dir, "ckp")
   checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
