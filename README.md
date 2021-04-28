@@ -35,11 +35,12 @@ python eval.py --test_data_json=PATH_TO_BE_CONFIGURED/val2018.json \
 
 ### Results
 
-| Prior                              | Classifier* | Dataset  | Accuracy |
-|------------------------------------|-------------|----------|----------|
-| No Prior [1]                       | InceptionV3 | iNat2018 | 60.20    |
-| Geo Prior (no photographer) [1]    | InceptionV3 | iNat2018 | 72.84    |
+| Prior                                   | Classifier* | Dataset  | Accuracy |
+|-----------------------------------------|-------------|----------|----------|
+| No Prior [1]                            | InceptionV3 | iNat2018 | 60.20    |
+| Geo Prior (no photographer) [1]         | InceptionV3 | iNat2018 | 72.84    |
 | Geo Prior (no photographer) [(ours)](https://drive.google.com/file/d/1lQ3X1x3cAu-o0hvg1eribtY0oKfDjtFx/view?usp=sharing) | InceptionV3 | iNat2018 | 71.53    |
+| Geo Prior + BN (no photographer) (ours) | InceptionV3 | iNat2018 | 71.91    |
 
 *Classifier predictions are from original paper [1] and they can be found in [2].
 
