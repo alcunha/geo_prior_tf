@@ -71,6 +71,10 @@ flags.DEFINE_bool(
     'use_photographers', default=False,
     help=('Include photographers classifier to the model'))
 
+flags.DEFINE_bool(
+    'use_batch_normalization', default=False,
+    help=('Include Batch Normalization to the model'))
+
 flags.DEFINE_integer(
     'batch_size', default=1024,
     help=('Batch size used during training.'))
@@ -174,7 +178,8 @@ def main(_):
                 embed_dim=FLAGS.embed_dim,
                 num_classes=num_classes,
                 rand_sample_generator=randgen,
-                num_users=(num_users if FLAGS.use_photographers else 0))
+                num_users=(num_users if FLAGS.use_photographers else 0),
+                use_bn=FLAGS.use_batch_normalization)
 
   loss_o_loc = losses.weighted_binary_cross_entropy(pos_weight=num_classes)
 

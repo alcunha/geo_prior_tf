@@ -80,6 +80,10 @@ flags.DEFINE_integer(
     'embed_dim', default=256,
     help=('Embedding dimension for geo prior model'))
 
+flags.DEFINE_bool(
+    'use_batch_normalization', default=False,
+    help=('Include Batch Normalization to the model'))
+
 flags.DEFINE_string(
     'cnn_predictions_file', default=None,
     help=('File .npz containing class predictions for images on test dataset'))
@@ -146,7 +150,8 @@ def load_prior_model(num_feats):
                 embed_dim=FLAGS.embed_dim,
                 num_classes=FLAGS.num_classes,
                 rand_sample_generator=randgen,
-                num_users=FLAGS.num_users)
+                num_users=FLAGS.num_users,
+                use_bn=FLAGS.use_batch_normalization)
   
   checkpoint_path = os.path.join(FLAGS.ckpt_dir, "ckp")
   model.load_weights(checkpoint_path)

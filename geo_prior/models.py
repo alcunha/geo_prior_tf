@@ -14,27 +14,37 @@
 
 import tensorflow as tf
 
-def _create_res_layer(inputs, embed_dim):
+def _create_res_layer(inputs, embed_dim, use_bn=False):
   x = tf.keras.layers.Dense(embed_dim)(inputs)
+  if use_bn:
+    x = tf.keras.layers.BatchNormalization()(x)
   x = tf.keras.layers.Activation('relu')(x)
   x = tf.keras.layers.Dropout(rate=0.5)(x)
   x = tf.keras.layers.Dense(embed_dim)(x)
+  if use_bn:
+    x = tf.keras.layers.BatchNormalization()(x)
   x = tf.keras.layers.Activation('relu')(x)
   outputs = tf.keras.layers.add([inputs, x])
 
   return outputs
 
-def _create_loc_encoder(inputs, embed_dim, num_res_blocks):
+def _create_loc_encoder(inputs, embed_dim, num_res_blocks, use_bn=False):
   x = tf.keras.layers.Dense(embed_dim)(inputs)
+  if use_bn:
+    x = tf.keras.layers.BatchNormalization()(x)
   x = tf.keras.layers.Activation('relu')(x)
   for _ in range(num_res_blocks):
     x = _create_res_layer(x, embed_dim)
 
   return x
 
-def _create_FCNet(num_inputs, num_classes, embed_dim, num_res_blocks=4):
+def _create_FCNet(num_inputs,
+                  num_classes,
+                  embed_dim,
+                  num_res_blocks=4,
+                  use_bn=False):
   inputs = tf.keras.Input(shape=(num_inputs,))
-  loc_embed = _create_loc_encoder(inputs, embed_dim, num_res_blocks)
+  loc_embed = _create_loc_encoder(inputs, embed_dim, num_res_blocks, use_bn)
   class_embed = tf.keras.layers.Dense(num_classes,
                                       activation='sigmoid',
                                       use_bias=False)(loc_embed)
@@ -45,12 +55,12 @@ def _create_FCNet(num_inputs, num_classes, embed_dim, num_res_blocks=4):
 
 class FCNet(tf.keras.Model):
   def __init__(self, num_inputs, embed_dim, num_classes, rand_sample_generator,
-                num_users=0, num_res_blocks=4):
+                num_users=0, num_res_blocks=4, use_bn=False):
     super(FCNet, self).__init__()
     if num_users > 1:
       raise RuntimeError('Users branch not implemented')
     self.model = _create_FCNet(num_inputs, num_classes, embed_dim,
-                               num_res_blocks=num_res_blocks)
+                               num_res_blocks=num_res_blocks, use_bn=use_bn)
     self.rand_sample_generator = rand_sample_generator
 
   def call(self, inputs):
