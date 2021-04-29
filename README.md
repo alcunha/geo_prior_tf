@@ -1,5 +1,7 @@
 This is an unofficial TensorFlow implementation of [Presence-Only Geographical Priors for Fine-Grained Image Classification](https://arxiv.org/abs/1906.05272)
 
+Currently, we have only implemented the object branch and its respective loss.
+
 ### Requirements
 
 Prepare an environment with python=3.8, tensorflow=2.3.1.
