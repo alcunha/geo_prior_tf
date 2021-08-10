@@ -127,14 +127,9 @@ class JsonInatInputProcessor:
                       cat_metadata.date_c,
                       cat_metadata.user_id,
                       cat_metadata.category_id))
-      cat_ds = cat_ds.shuffle(num_instances_cat)
-      
-      if num_instances_cat > self.max_instances_per_class:
-        categories_weights.append(float(self.max_instances_per_class))
-        cat_ds = cat_ds.take(self.max_instances_per_class)
-      else:
-        categories_weights.append(float(num_instances_cat))
-      
+      cat_ds = cat_ds.shuffle(num_instances_cat).repeat()
+      cat_weight = float(min(num_instances_cat, self.max_instances_per_class))
+      categories_weights.append(cat_weight)      
       categories_ds.append(cat_ds)
 
     dataset = tf.data.experimental.sample_from_datasets(

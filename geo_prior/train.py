@@ -137,7 +137,7 @@ def lr_scheduler(epoch, lr):
   else:
       return lr * FLAGS.lr_decay
 
-def train_model(model, dataset, val_dataset, loss_fn):
+def train_model(model, dataset, num_train_instances, val_dataset, loss_fn):
   summary_dir = os.path.join(FLAGS.model_dir, "summaries")
   summary_callback = tf.keras.callbacks.TensorBoard(summary_dir,
                                                     profile_batch=0)
@@ -156,6 +156,7 @@ def train_model(model, dataset, val_dataset, loss_fn):
 
   return model.fit(dataset,
                    epochs=FLAGS.epochs,
+                   steps_per_epoch=int(num_train_instances/FLAGS.batch_size),
                    callbacks=callbacks,
                    validation_data=val_dataset)
 
@@ -167,7 +168,7 @@ def set_random_seeds():
 def main(_):
   set_random_seeds()
 
-  dataset, _, num_classes, num_users, num_feats = build_input_data(
+  dataset, num_instances, num_classes, num_users, num_feats = build_input_data(
     FLAGS.train_data_json, FLAGS.train_location_info_json, is_training=True)
   randgen = dataloader.RandSpatioTemporalGenerator(
       loc_encode=FLAGS.loc_encode,
@@ -192,7 +193,7 @@ def main(_):
   model.build((None, num_feats))
   model.summary()
 
-  train_model(model, dataset, val_dataset, loss_o_loc)
+  train_model(model, dataset, num_instances, val_dataset, loss_o_loc)
 
 if __name__ == '__main__':
   app.run(main)
