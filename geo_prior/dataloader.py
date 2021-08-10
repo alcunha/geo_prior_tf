@@ -112,16 +112,14 @@ class JsonInatInputProcessor:
     return images, num_classes
 
   def _get_balanced_dataset(self, metadata):
-    num_instances = 0
-    dataset = None
-    other_categories = []
+    categories_ds = []
+    categories_weights = []
+
     for category in list(metadata.category_id.unique()):
       cat_metadata = metadata[metadata.category_id == category]
       num_instances_cat = len(cat_metadata)
 
-      if num_instances_cat > self.max_instances_per_class:
-        num_instances += self.max_instances_per_class
-        cat_ds = tf.data.Dataset.from_tensor_slices((
+      cat_ds = tf.data.Dataset.from_tensor_slices((
                       cat_metadata.id,
                       cat_metadata.valid,
                       cat_metadata.lat,
@@ -129,24 +127,20 @@ class JsonInatInputProcessor:
                       cat_metadata.date_c,
                       cat_metadata.user_id,
                       cat_metadata.category_id))
-        cat_ds = cat_ds.shuffle(num_instances_cat)
+      cat_ds = cat_ds.shuffle(num_instances_cat)
+      
+      if num_instances_cat > self.max_instances_per_class:
+        categories_weights.append(float(self.max_instances_per_class))
         cat_ds = cat_ds.take(self.max_instances_per_class)
-        dataset = cat_ds if dataset is None else dataset.concatenate(cat_ds)
       else:
-        other_categories.append(category)
-        num_instances += num_instances_cat
+        categories_weights.append(float(num_instances_cat))
+      
+      categories_ds.append(cat_ds)
 
-    self.num_instances = num_instances
-    others_metadata = metadata[metadata.category_id.isin(other_categories)]
-    others_ds = tf.data.Dataset.from_tensor_slices((
-                      others_metadata.id,
-                      others_metadata.valid,
-                      others_metadata.lat,
-                      others_metadata.lon,
-                      others_metadata.date_c,
-                      others_metadata.user_id,
-                      others_metadata.category_id))
-    dataset = others_ds if dataset is None else dataset.concatenate(others_ds)
+    dataset = tf.data.experimental.sample_from_datasets(
+                                                categories_ds,
+                                                weights=categories_weights)
+    self.num_instances = int(sum(categories_weights))
 
     return dataset
 
@@ -185,11 +179,11 @@ class JsonInatInputProcessor:
         metadata.date_c,
         metadata.user_id,
         metadata.category_id))
+
+      if self.is_training:
+        dataset.shuffle(self.num_instances)
     else:
       dataset = self._get_balanced_dataset(metadata)
-
-    if self.is_training:
-      dataset.shuffle(self.num_instances)
 
     def _encode_feat(feat, encode):
       if encode == 'encode_cos_sin':
