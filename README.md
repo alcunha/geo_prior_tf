@@ -11,11 +11,17 @@ Dependencies can be installed using the following command:
 pip install -r requirements.txt
 ```
 
+### Data
+
+Please refer to the [iNat 2018 Github page](https://github.com/visipedia/inat_comp/tree/master/2018) for additional dataset details and download links.
+
+The original CNN predictions file used for evaluation can be downloaded from the official project [website](http://www.vision.caltech.edu/~macaodha/projects/geopriors/index.html).
+
 ### Training
 
 To train a geo prior model use the script `train.py`:
 ```bash
-python train.py --train_data_json=../data/train2018.json \
+python train.py --train_data_json=PATH_TO_BE_CONFIGURED/train2018.json \
     --train_location_info_json=PATH_TO_BE_CONFIGURED/train2018_locations.json \
     --val_data_json=PATH_TO_BE_CONFIGURED/val2018.json \
     --val_location_info_json=PATH_TO_BE_CONFIGURED/val2018_locations.json \
