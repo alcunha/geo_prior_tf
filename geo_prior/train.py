@@ -137,7 +137,13 @@ def lr_scheduler(epoch, lr):
   else:
       return lr * FLAGS.lr_decay
 
-def train_model(model, dataset, num_train_instances, val_dataset, loss_fn):
+def train_model(model,
+                dataset,
+                num_train_instances,
+                val_dataset,
+                loss_o_loc,
+                loc_p_loss,
+                p_o_loss):
   summary_dir = os.path.join(FLAGS.model_dir, "summaries")
   summary_callback = tf.keras.callbacks.TensorBoard(summary_dir,
                                                     profile_batch=0)
@@ -152,7 +158,10 @@ def train_model(model, dataset, num_train_instances, val_dataset, loss_fn):
 
   callbacks = [summary_callback, checkpoint_callback, lr_callback]
 
-  model.compile(optimizer=optimizer, loc_o_loss=loss_fn)
+  model.compile(optimizer=optimizer,
+                loc_o_loss=loss_o_loc,
+                loc_p_loss=loc_p_loss,
+                p_o_loss=p_o_loss)
 
   return model.fit(dataset,
                    epochs=FLAGS.epochs,
@@ -189,11 +198,14 @@ def main(_):
                 use_bn=FLAGS.use_batch_normalization)
 
   loss_o_loc = losses.weighted_binary_cross_entropy(pos_weight=num_classes)
+  loc_p_loss = losses.log_loss()
+  p_o_loss = losses.weighted_binary_cross_entropy(pos_weight=num_classes)
 
   model.build((None, num_feats))
   model.summary()
 
-  train_model(model, dataset, num_instances, val_dataset, loss_o_loc)
+  train_model(model, dataset, num_instances, val_dataset,
+              loss_o_loc, loc_p_loss, p_o_loss)
 
 if __name__ == '__main__':
   app.run(main)

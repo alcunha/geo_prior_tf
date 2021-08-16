@@ -175,7 +175,11 @@ def eval_model(cnn_model, prior_model, dataset):
     cnn_preds = cnn_model.get_predictions(ids)
 
     if FLAGS.prior_type == 'geo_prior':
-      prior_preds = prior_model(batch, training=False)
+      prior_preds_origin = prior_model(batch, training=False)
+      if FLAGS.num_users > 0:
+        prior_preds = prior_preds_origin[0]
+      else:
+        prior_preds = prior_preds_origin
       preds = mix_predictions(cnn_preds, prior_preds, valid)
     elif FLAGS.prior_type == 'no_prior':
       preds = cnn_preds

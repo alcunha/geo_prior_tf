@@ -46,21 +46,24 @@ def _create_FCNet(num_inputs,
                   use_bn=False):
   inputs = tf.keras.Input(shape=(num_inputs,))
   loc_embed = _create_loc_encoder(inputs, embed_dim, num_res_blocks, use_bn)
-  class_embed = tf.keras.layers.Dense(num_classes,
-                                      activation='sigmoid',
-                                      use_bias=False)(loc_embed)
+  class_embed_layer = tf.keras.layers.Dense(num_classes,
+                                            activation='sigmoid',
+                                            use_bias=False)
+  class_embed = class_embed_layer(loc_embed)
+
   if num_users > 0:
-    user_emb = tf.keras.layers.Dense(num_users,
-                                     activation='sigmoid',
-                                     use_bias=False)(loc_embed)
+    user_emb_layer = tf.keras.layers.Dense(num_users,
+                                           activation='sigmoid',
+                                           use_bias=False)
+    user_emb = user_emb_layer(loc_embed)
     outputs = [class_embed, user_emb]
   else:
     outputs = [class_embed]
-    user_emb = None
+    user_emb_layer = None
 
   model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
 
-  return model, class_embed, user_emb
+  return model, class_embed_layer, user_emb_layer
 
 class FCNet(tf.keras.Model):
   def __init__(self, num_inputs, embed_dim, num_classes, rand_sample_generator,
@@ -93,13 +96,6 @@ class FCNet(tf.keras.Model):
     x, y = data
     batch_size = tf.shape(x)[0]
 
-    rand_samples = self.rand_sample_generator.get_rand_samples(batch_size)
-    combined_inputs = tf.concat([x, rand_samples], axis=0)
-    
-    # The localization loss on the paper for the random points is equivalent to
-    # the Binary Cross Entropy considering all labels as zero
-    rand_labels = tf.zeros(shape=y.shape)
-
     if self.user_emb is not None:
       y_class_true = y[0]
       y_user_true = y[1]
@@ -107,12 +103,37 @@ class FCNet(tf.keras.Model):
       y_class_true = y
       y_user_true = None
 
+    rand_samples = self.rand_sample_generator.get_rand_samples(batch_size)
+    combined_inputs = tf.concat([x, rand_samples], axis=0)
+    
+    # The localization loss on the paper for the random points is equivalent to
+    # the Binary Cross Entropy considering all labels as zero
+    rand_labels = tf.zeros(shape=y_class_true.shape)
+
     with tf.GradientTape() as tape:
       preds = self(combined_inputs, training=True)
       total_loss = 0
 
       if self.user_emb is not None:
         y_pred = preds[0]
+        y_pred_user = preds[1]
+
+        total_loss += self.loc_p_loss(y_user_true, y_pred_user[:batch_size])
+
+        # For the random points
+        y_pred_user_rand = 1 - y_pred_user[:batch_size]
+        total_loss += self.loc_p_loss(y_user_true, y_pred_user_rand)
+
+        # User class loss is equivalent to filter the category/user affinity
+        # using the user labels and then applying the weighted binary cross
+        # entropy loss considering the object labels as the true label
+        p_c_given_u = tf.matmul(y_user_true,
+                                self.user_emb.kernel,
+                                transpose_b=True)
+        p_c_given_u = tf.matmul(p_c_given_u, self.class_embed.kernel)
+        p_c_given_u = tf.sigmoid(p_c_given_u)
+        total_loss += self.p_o_loss(y_class_true, p_c_given_u)
+
       else:
         y_pred = preds
 
