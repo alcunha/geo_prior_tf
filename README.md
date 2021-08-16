@@ -1,7 +1,5 @@
 This is an unofficial TensorFlow implementation of [Presence-Only Geographical Priors for Fine-Grained Image Classification](https://arxiv.org/abs/1906.05272)
 
-Currently, we have only implemented the object branch and its respective loss.
-
 ### Requirements
 
 Prepare an environment with python=3.8, tensorflow=2.3.1.
@@ -47,10 +45,11 @@ python eval.py --test_data_json=PATH_TO_BE_CONFIGURED/val2018.json \
 |-----------------------------------------|-------------|----------|----------|
 | No Prior [1]                            | InceptionV3 | iNat2018 | 60.20    |
 | Geo Prior (no photographer) [1]         | InceptionV3 | iNat2018 | 72.84    |
-| Geo Prior (no photographer) [(ours)](https://drive.google.com/file/d/1bNqlcKZ-lwo-OWbhFcbFQSHFtwjNeEUj/view?usp=sharing)  | InceptionV3 | iNat2018 | 72.89    |
-| Geo Prior + BN (no photographer) [(ours)](https://drive.google.com/file/d/1S-k1BYbG-P44lPYKt3zOTag61UGWpZKG/view?usp=sharing) | InceptionV3 | iNat2018 | 72.76    |
+| Geo Prior (no photographer) [(ours)](https://drive.google.com/file/d/1get9lJEK2jw3qKPIXNd6037Kwz0kQQbC/view?usp=sharing)  | InceptionV3 | iNat2018 | 72.94    |
+| Geo Prior (full) [1]                    | InceptionV3 | iNat2018 | 72.68    |
+| Geo Prior (full) [(ours)](https://drive.google.com/file/d/1I5tSBM1LxZgGLJZFGq-IILepKQocnL1d/view?usp=sharing)             | InceptionV3 | iNat2018 | 72.84    |
 
-*Classifier predictions are from original paper [1] and they can be found in [2].
+*Classifier predictions are from the original paper [1].
 
 ### Source
 

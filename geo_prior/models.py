@@ -118,11 +118,11 @@ class FCNet(tf.keras.Model):
         y_pred = preds[0]
         y_pred_user = preds[1]
 
-        total_loss += self.loc_p_loss(y_user_true, y_pred_user[:batch_size])
+        phot_loss = self.loc_p_loss(y_user_true, y_pred_user[:batch_size])
 
         # For the random points
         y_pred_user_rand = 1 - y_pred_user[:batch_size]
-        total_loss += self.loc_p_loss(y_user_true, y_pred_user_rand)
+        phot_loss_rand = self.loc_p_loss(y_user_true, y_pred_user_rand)
 
         # User class loss is equivalent to filter the category/user affinity
         # using the user labels and then applying the weighted binary cross
@@ -132,13 +132,16 @@ class FCNet(tf.keras.Model):
                                 transpose_b=True)
         p_c_given_u = tf.matmul(p_c_given_u, self.class_embed.kernel)
         p_c_given_u = tf.sigmoid(p_c_given_u)
-        total_loss += self.p_o_loss(y_class_true, p_c_given_u)
+        phot_obj_loss = self.p_o_loss(y_class_true, p_c_given_u)
+
+        total_loss = phot_loss + phot_loss_rand + phot_obj_loss
 
       else:
         y_pred = preds
 
-      total_loss += self.loc_o_loss(y_class_true, y_pred[:batch_size])
-      total_loss += self.loc_o_loss(rand_labels, y_pred[batch_size:])
+      obj_loss = self.loc_o_loss(y_class_true, y_pred[:batch_size])
+      obj_loss_rand = self.loc_o_loss(rand_labels, y_pred[batch_size:])
+      total_loss = total_loss + obj_loss + obj_loss_rand 
 
     trainable_vars = self.trainable_variables
     gradients = tape.gradient(total_loss, trainable_vars)
@@ -148,6 +151,12 @@ class FCNet(tf.keras.Model):
     self.compiled_metrics.update_state(y, y_pred)
     metrics = {m.name: m.result() for m in self.metrics}
     metrics['loss'] = total_loss
+    metrics['obj_loss'] = obj_loss
+    metrics['obj_loss_rand'] = obj_loss_rand
+    if self.user_emb is not None:
+      metrics['phot_loss'] = phot_loss
+      metrics['phot_loss_rand'] = phot_loss_rand
+      metrics['phot_obj_loss'] = phot_obj_loss
 
     return metrics
 
@@ -167,5 +176,6 @@ class FCNet(tf.keras.Model):
     self.compiled_metrics.update_state(y_true, y_pred_class)
     metrics = {m.name: m.result() for m in self.metrics}
     metrics['loss'] = loss
+    metrics['obj_loss'] = loss
 
     return metrics
