@@ -152,7 +152,7 @@ def train_model(model, dataset, num_train_instances, val_dataset, loss_fn):
 
   callbacks = [summary_callback, checkpoint_callback, lr_callback]
 
-  model.compile(optimizer=optimizer, loss=loss_fn)
+  model.compile(optimizer=optimizer, loc_o_loss=loss_fn)
 
   return model.fit(dataset,
                    epochs=FLAGS.epochs,
