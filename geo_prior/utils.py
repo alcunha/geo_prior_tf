@@ -34,6 +34,8 @@ flags.DEFINE_integer(
     help=('Magnitude in meters for location data augmentation'))
 
 def date2float(date):
+    if date is None:
+        date = datetime.datetime.today().strftime(FLAGS.datetime_format)
     dt = datetime.datetime.strptime(date, FLAGS.datetime_format).timetuple()
     year_days = 366 if calendar.isleap(dt.tm_year) else 365
     

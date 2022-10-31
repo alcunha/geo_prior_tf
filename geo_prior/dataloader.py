@@ -74,9 +74,13 @@ class JsonInatInputProcessor:
 
     if ('user_id' not in metadata.columns):
       metadata['user_id'] = 0
+    
+    if ('valid' not in metadata.columns):
+      metadata['valid'] = ~metadata.longitude.isna()
+    else:
+      metadata['valid'] = metadata['valid'].astype('bool')
     metadata['lat'] = metadata['latitude']
     metadata['lon'] = metadata['longitude']
-    metadata['valid'] = ~metadata.longitude.isna()
     metadata['date_c'] = metadata.apply(
                             lambda row: utils.date2float(row['date']), axis=1)
 
@@ -198,6 +202,7 @@ class JsonInatInputProcessor:
       lon = _encode_feat(lon, self.loc_encode)
 
       if self.use_date_feats:
+        date_c = tf.cond(valid, lambda: date_c, lambda: tf.cast(0.5, tf.float64))
         if self.is_training and self.use_data_augmentation:
           date_c = utils.random_date(date_c)
 
